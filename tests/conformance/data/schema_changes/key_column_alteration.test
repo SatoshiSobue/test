@@ -1,0 +1,81 @@
+# Can't alter parent key columns.
+CREATE TABLE Users (
+  UserId STRING(20) NOT NULL
+) PRIMARY KEY(UserId);
+CREATE TABLE Albums (
+  UserId STRING(20) NOT NULL
+) PRIMARY KEY(UserId), INTERLEAVE IN PARENT Users ON DELETE CASCADE;
+ALTER TABLE Albums ALTER COLUMN UserId STRING(40) NOT NULL;
+--
+ERROR: Cannot alter parent key column Albums.UserId.
+==
+# Remove NOT NULL from key in table with children.
+CREATE TABLE Users (
+  UserId INT64 NOT NULL
+) PRIMARY KEY(UserId);
+CREATE TABLE Albums (
+  UserId INT64 NOT NULL
+) PRIMARY KEY(UserId), INTERLEAVE IN PARENT Users ON DELETE CASCADE;
+ALTER TABLE Users ALTER COLUMN UserId INT64;
+--
+ERROR: Requested change to key column Users.UserId could not be made.
+==
+# allow_commit_timestamp option can be altered independently of
+# the parent key column.
+CREATE TABLE T1 (
+  ts TIMESTAMP
+) PRIMARY KEY(ts);
+CREATE TABLE T2 (
+  ts TIMESTAMP
+) PRIMARY KEY(ts), INTERLEAVE IN PARENT T1 ON DELETE CASCADE;
+ALTER TABLE T2 ALTER COLUMN ts SET OPTIONS
+( allow_commit_timestamp = true );
+--
+CREATE TABLE T1 (
+  ts TIMESTAMP,
+) PRIMARY KEY(ts);
+CREATE TABLE T2 (
+  ts TIMESTAMP OPTIONS (
+    allow_commit_timestamp = true
+  ),
+) PRIMARY KEY(ts),
+  INTERLEAVE IN PARENT T1 ON DELETE CASCADE;
+==
+CREATE TABLE baz (
+  column1 STRING(32) NOT NULL,
+  column2 STRING(64) NOT NULL,
+) PRIMARY KEY(column1, column2);
+CREATE TABLE foo (
+  column1 STRING(32) NOT NULL,
+  column2 STRING(64) NOT NULL,
+  column3 STRING(32) NOT NULL,
+  created TIMESTAMP NOT NULL,
+) PRIMARY KEY(column1, column2, column3, created DESC),
+  INTERLEAVE IN PARENT baz ON DELETE CASCADE;
+ALTER TABLE foo ALTER COLUMN created SET OPTIONS
+(allow_commit_timestamp = true)
+--
+CREATE TABLE baz (
+  column1 STRING(32) NOT NULL,
+  column2 STRING(64) NOT NULL,
+) PRIMARY KEY(column1, column2);
+CREATE TABLE foo (
+  column1 STRING(32) NOT NULL,
+  column2 STRING(64) NOT NULL,
+  column3 STRING(32) NOT NULL,
+  created TIMESTAMP NOT NULL OPTIONS (
+    allow_commit_timestamp = true
+  ),
+) PRIMARY KEY(column1, column2, column3, created DESC),
+  INTERLEAVE IN PARENT baz ON DELETE CASCADE;
+==
+# No-op alters of key columns are still invalid
+CREATE TABLE T1 (
+  ts TIMESTAMP
+) PRIMARY KEY(ts);
+CREATE TABLE T2 (
+  ts TIMESTAMP
+) PRIMARY KEY(ts), INTERLEAVE IN PARENT T1 ON DELETE CASCADE;
+ALTER TABLE T2 ALTER COLUMN ts TIMESTAMP
+--
+ERROR: Cannot alter parent key column T2.ts.
